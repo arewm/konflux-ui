@@ -21,6 +21,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  &__matrix-info {
+    margin-top: var(--pf-v5-global--spacer--xs);
+    font-size: var(--pf-v5-global--FontSize--sm);
+    color: var(--pf-v5-global--Color--200);
+  }
+  &__matrix-label {
+    font-style: italic;
+    opacity: 0.8;
+  }
   &__log {
     height: 100%;
     padding-top: var(--pf-v5-global--spacer--lg);

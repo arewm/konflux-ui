@@ -43,6 +43,31 @@ export type PipelineTaskWithStatus = PipelineTask & {
   steps?: StepStatus[];
 };
 
+/**
+ * Enhanced matrix task type with generic matrix parameter support
+ */
+export type MatrixPipelineTaskWithStatus = PipelineTaskWithStatus & {
+  /** Original task name before matrix expansion */
+  originalName?: string;
+  /** Matrix parameter name (e.g., 'TARGET_PLATFORM', 'NODE_VERSION') */
+  matrixParameter?: string;
+  /** Matrix parameter value (e.g., 'linux-x86_64', '18.x') */
+  matrixValue?: string;
+  /** Human-readable display name for the matrix parameter */
+  matrixDisplayName?: string;
+  /** Whether this task is part of a matrix */
+  isMatrix?: boolean;
+  /** Legacy field for TARGET_PLATFORM compatibility */
+  matrixPlatform?: string;
+  /** All matrix parameters for this task instance */
+  matrixParameters?: Array<{
+    parameter: string;
+    value: string;
+    displayName: string;
+    isKnownParameter: boolean;
+  }>;
+};
+
 export type PipelineRunNodeModel<D extends PipelineRunNodeData, T> = Omit<
   PfPipelineNodeModel,
   'type'

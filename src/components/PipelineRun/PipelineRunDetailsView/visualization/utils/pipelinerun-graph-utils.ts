@@ -24,6 +24,10 @@ import {
   TektonResultsRun,
 } from '../../../../../types';
 import {
+  detectMatrixTasks,
+  detectMatrixParametersFromTaskRun,
+} from '../../../../../utils/matrix-pipeline-utils';
+import {
   pipelineRunStatus,
   runStatus,
   taskRunStatus,
@@ -160,6 +164,10 @@ export const createStepStatus = (
 type MatrixPipelineTaskWithStatus = PipelineTaskWithStatus & {
   originalName?: string;
   matrixPlatform?: string;
+  matrixParameter?: string;
+  matrixValue?: string;
+  matrixDisplayName?: string;
+  isMatrix?: boolean;
 };
 
 // Helper function to create a task with status from a TaskRun
@@ -230,20 +238,99 @@ const createTaskWithStatus = (
 };
 
 // Helper function to create a matrix task entry
+/**
+ * Sanitizes displayName values to prevent XSS attacks
+ * @param displayName - The display name to sanitize
+ * @returns Sanitized display name with a maximum length of 100 characters
+ */
+const sanitizeDisplayName = (displayName: string): string => {
+  if (!displayName) return '';
+
+  // Remove HTML tags and dangerous characters
+  const sanitized = displayName
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/[<>&]/g, '') // Remove dangerous characters but keep quotes for readability
+    .trim();
+
+  // Limit length to prevent UI issues
+  return sanitized.length > 100 ? sanitized.substring(0, 100) : sanitized;
+};
+
+/**
+ * Looks up displayName from PipelineRun.status.childReferences for a specific TaskRun
+ * @param pipelineRun - The PipelineRun containing childReferences
+ * @param taskRunName - The name of the TaskRun to find displayName for
+ * @returns The sanitized displayName if found, undefined otherwise
+ */
+const getDisplayNameFromChildReferences = (
+  pipelineRun: PipelineRunKind,
+  taskRunName: string,
+): string | undefined => {
+  const childReferences = pipelineRun.status?.childReferences;
+  if (!childReferences) return undefined;
+
+  const childRef = (childReferences as Array<{ name: string; displayName?: string }>).find(
+    (ref) => ref.name === taskRunName,
+  );
+  if (!childRef?.displayName) return undefined;
+
+  return sanitizeDisplayName(childRef.displayName);
+};
 const createMatrixTaskEntry = (
   task: PipelineTask,
   taskRun: TaskRunKind,
-  platform: string,
+  pipelineRun: PipelineRunKind,
+  matrixParameter?: string,
+  matrixValue?: string,
+  matrixDisplayName?: string,
 ): MatrixPipelineTaskWithStatus => {
   const matrixTask = createTaskWithStatus(task, taskRun) as MatrixPipelineTaskWithStatus;
 
-  // Add platform suffix to make the name unique for React rendering
-  // But preserve original name for dependency resolution
-  matrixTask.name = `${task.name}-${platform.replace(/[^a-zA-Z0-9]/g, '-')}`;
+  // Try to get displayName from childReferences first, then fallback to provided matrixDisplayName
+  const taskRunName = taskRun.metadata?.name;
+  const childRefDisplayName = taskRunName
+    ? getDisplayNameFromChildReferences(pipelineRun, taskRunName)
+    : undefined;
 
-  // Store original name and platform info for later use
+  // Determine display name and suffix for the task name
+  let displayName: string;
+  let nameSuffix: string;
+
+  if (childRefDisplayName) {
+    // Use displayName from childReferences (highest priority)
+    displayName = childRefDisplayName;
+    nameSuffix = childRefDisplayName.replace(/[^a-zA-Z0-9]/g, '-');
+  } else if (matrixDisplayName) {
+    // Use provided matrixDisplayName (fallback)
+    displayName = sanitizeDisplayName(matrixDisplayName);
+    nameSuffix = displayName.replace(/[^a-zA-Z0-9]/g, '-');
+  } else if (matrixValue) {
+    // For TARGET_PLATFORM, convert dashes to slashes for display
+    displayName =
+      matrixParameter === 'build.appstudio.redhat.com/target-platform'
+        ? matrixValue.replace(/-/g, '/')
+        : matrixValue;
+    nameSuffix = matrixValue.replace(/[^a-zA-Z0-9]/g, '-');
+  } else {
+    displayName = 'unknown';
+    nameSuffix = 'unknown';
+  }
+
+  // Add suffix to make the name unique for React rendering
+  // But preserve original name for dependency resolution
+  matrixTask.name = `${task.name}-${nameSuffix}`;
+
+  // Store original name and matrix info for later use
   matrixTask.originalName = task.name;
-  matrixTask.matrixPlatform = platform;
+  matrixTask.matrixParameter = matrixParameter;
+  matrixTask.matrixValue = matrixValue;
+  matrixTask.matrixDisplayName = displayName;
+  matrixTask.isMatrix = true;
+
+  // Maintain backward compatibility for TARGET_PLATFORM
+  if (matrixParameter === 'build.appstudio.redhat.com/target-platform') {
+    matrixTask.matrixPlatform = displayName;
+  }
 
   return matrixTask;
 };
@@ -254,20 +341,25 @@ export const appendStatus = (
   taskRuns: TaskRunKind[],
   isFinallyTasks = false,
 ): PipelineTaskWithStatus[] => {
+  // Handle null pipeline case
+  if (!pipeline) {
+    return [];
+  }
+
   const tasks = (isFinallyTasks ? pipeline.spec.finally : pipeline.spec.tasks) || [];
   const overallPipelineRunStatus = pipelineRunStatus(pipelineRun);
 
-  // Group TaskRuns by pipeline task name to detect matrix tasks
+  // Use generic matrix detection to identify matrix tasks
+  const matrixTasksMap = detectMatrixTasks(taskRuns || []);
+
+  // Group TaskRuns by pipeline task name for processing
   const taskRunsByTaskName = new Map<string, TaskRunKind[]>();
   taskRuns?.forEach((tr) => {
     const taskName = tr.metadata.labels?.[TektonResourceLabel.pipelineTask];
     if (taskName) {
-      const existingTaskRuns = taskRunsByTaskName.get(taskName);
-      if (existingTaskRuns) {
-        existingTaskRuns.push(tr);
-      } else {
-        taskRunsByTaskName.set(taskName, [tr]);
-      }
+      const existingTaskRuns = taskRunsByTaskName.get(taskName) || [];
+      existingTaskRuns.push(tr);
+      taskRunsByTaskName.set(taskName, existingTaskRuns);
     }
   });
 
@@ -296,22 +388,38 @@ export const appendStatus = (
       return;
     }
 
-    // Check if this is a matrix task (multiple TaskRuns with platform labels)
-    const platformTaskRuns = taskRunsForTask.filter(
-      (tr) => tr.metadata.labels?.[TaskRunLabel.TARGET_PLATFORM],
-    );
+    // Check if this is a matrix task using generic detection
+    const matrixInfo = matrixTasksMap.get(task.name);
 
-    if (platformTaskRuns.length > 1) {
-      // Matrix task detected - create one entry per platform
-      platformTaskRuns.forEach((taskRun) => {
-        const platform = taskRun.metadata.labels[TaskRunLabel.TARGET_PLATFORM];
-        const platformDisplay = platform?.replace(/-/g, '/') || 'unknown';
+    if (matrixInfo?.isMatrix) {
+      // Matrix task detected - create one entry per matrix instance
+      taskRunsForTask.forEach((taskRun) => {
+        // Get matrix parameters for this specific TaskRun
+        const matrixParams = detectMatrixParametersFromTaskRun(taskRun);
 
-        const matrixTask = createMatrixTaskEntry(task, taskRun, platformDisplay);
-        result.push(matrixTask);
+        // Use the first matrix parameter for display (backward compatibility)
+        const primaryParam = matrixParams[0];
+
+        if (primaryParam) {
+          const matrixValue = taskRun.metadata.annotations?.[primaryParam.parameter];
+
+          const matrixTask = createMatrixTaskEntry(
+            task,
+            taskRun,
+            pipelineRun,
+            primaryParam.parameter,
+            matrixValue,
+            primaryParam.displayName,
+          );
+          result.push(matrixTask);
+        } else {
+          // Fallback to regular task if no matrix parameters found
+          const regularTask = createTaskWithStatus(task, taskRun);
+          result.push(regularTask);
+        }
       });
     } else {
-      // Regular task or single-platform matrix - create single entry
+      // Regular task - create single entry
       const taskRun = taskRunsForTask[0];
       const regularTask = createTaskWithStatus(task, taskRun);
       result.push(regularTask);
@@ -476,11 +584,13 @@ const getGraphDataModel = (
       // Expand matrix task dependencies
       const expandedRunAfterTasks = expandMatrixDependencies(runAfterTasks, taskList);
 
-      // For matrix tasks, use a display name that includes platform info
+      // For matrix tasks, use matrixDisplayName for better labels
       const matrixTask = task as MatrixPipelineTaskWithStatus;
-      const displayName = matrixTask.matrixPlatform
-        ? `${matrixTask.originalName} (${matrixTask.matrixPlatform})`
-        : task.name;
+      const displayName = matrixTask.matrixDisplayName
+        ? `${matrixTask.originalName || task.name} (${matrixTask.matrixDisplayName})`
+        : matrixTask.matrixPlatform
+          ? `${matrixTask.originalName} (${matrixTask.matrixPlatform})`
+          : task.name;
 
       // For matrix tasks, find the specific TaskRun for this platform
       let taskRunForTask: TaskRunKind | undefined;

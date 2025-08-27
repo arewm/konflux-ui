@@ -5,6 +5,20 @@ import { FilterType } from '../utils/filter-utils';
 
 const safeJSONParse = (value: string) => {
   if (!value) return null;
+
+  // Only attempt JSON parsing if the value looks like it might be JSON
+  // (starts with {, [, ", or is a number, or is a JSON literal like "null", "true", "false")
+  const looksLikeJSON =
+    /^[{["]/.test(value) ||
+    /^-?\d+(\.\d+)?$/.test(value) ||
+    /^"(null|true|false)"$/.test(value) ||
+    /^(null|true|false)$/.test(value);
+
+  if (!looksLikeJSON) {
+    // If it doesn't look like JSON, return the value as-is without warning
+    return value;
+  }
+
   try {
     // first try to parse the value
     return JSON.parse(value);

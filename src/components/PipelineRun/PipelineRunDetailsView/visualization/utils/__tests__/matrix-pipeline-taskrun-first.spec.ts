@@ -58,6 +58,8 @@ describe('Matrix Pipeline TaskRun-First Approach', () => {
       namespace: 'test-ns',
       labels: {
         [TektonResourceLabel.pipelineTask]: taskName,
+      },
+      annotations: {
         ...(platform && { [TaskRunLabel.TARGET_PLATFORM]: platform }),
       },
     },
@@ -115,7 +117,7 @@ describe('Matrix Pipeline TaskRun-First Approach', () => {
       expect(result[2].name).toBe('test-task');
     });
 
-    it('should handle single TaskRun with platform label as regular task', () => {
+    it('should handle single TaskRun with platform label as matrix task', () => {
       const taskRuns = [
         createMockTaskRun('build-task', 'linux-x86_64'),
         createMockTaskRun('test-task'),
@@ -124,8 +126,14 @@ describe('Matrix Pipeline TaskRun-First Approach', () => {
       const result = appendStatus(mockPipeline, mockPipelineRun, taskRuns);
 
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('build-task');
+      // Even single instances with matrix parameters should be treated as matrix tasks
+      expect(result[0].name).toBe('build-task-linux-x86-64');
       expect(result[1].name).toBe('test-task');
+
+      // Should be marked as matrix task
+      type MatrixTask = (typeof result)[0] & { isMatrix?: boolean; matrixPlatform?: string };
+      expect((result[0] as MatrixTask).isMatrix).toBe(true);
+      expect((result[0] as MatrixTask).matrixPlatform).toBe('linux/x86_64');
     });
 
     it('should preserve TaskRun status for matrix tasks', () => {

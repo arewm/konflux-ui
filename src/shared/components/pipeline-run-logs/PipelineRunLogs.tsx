@@ -6,6 +6,7 @@ import { ColoredStatusIcon } from '../../../components/topology/StatusIcon';
 import { PodGroupVersionKind } from '../../../models/pod';
 import { PipelineRunKind, PipelineTask, TaskRunKind, TektonResourceLabel } from '../../../types';
 import { WatchK8sResource } from '../../../types/k8s';
+import { detectMatrixTasks } from '../../../utils/matrix-pipeline-utils';
 import { pipelineRunStatus, runStatus, taskRunStatus } from '../../../utils/pipeline-utils';
 import { ErrorDetailsWithStaticLog } from './logs/log-snippet-types';
 import { getDownloadAllLogsCallback } from './logs/logs-utils';
@@ -67,6 +68,43 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
   getTaskRunName = (taskRunName: string) => {
     return this.props.taskRuns.find((taskRun) => taskRun.metadata.name === taskRunName)?.metadata
       ?.labels?.[TektonResourceLabel.pipelineTask];
+  };
+
+  getMatrixDisplayInfo = (taskRun: TaskRunKind) => {
+    const pipelineTaskName = taskRun?.metadata?.labels?.[TektonResourceLabel.pipelineTask];
+    if (!pipelineTaskName) return null;
+
+    const { taskRuns, obj } = this.props;
+    const matrixTasksMap = detectMatrixTasks(taskRuns);
+    const matrixInfo = matrixTasksMap.get(pipelineTaskName);
+
+    if (!matrixInfo?.isMatrix) return null;
+
+    // Look for displayName in childReferences first
+    const childReferences = obj.status?.childReferences;
+    const childRef = (childReferences as Array<{ name: string; displayName?: string }>)?.find(
+      (ref) => ref.name === taskRun.metadata.name,
+    );
+    if (childRef?.displayName) {
+      return { displayName: childRef.displayName, isMatrix: true };
+    }
+
+    // Fallback to matrix parameter detection
+    const matrixParams = matrixInfo.matrixParameters;
+    const primaryParam = matrixParams[0];
+    if (primaryParam) {
+      const matrixValue = taskRun.metadata.annotations?.[primaryParam.parameter];
+      if (matrixValue) {
+        // Transform TARGET_PLATFORM for better display
+        const displayValue =
+          primaryParam.parameter === 'build.appstudio.redhat.com/target-platform'
+            ? matrixValue.replace(/-/g, '/')
+            : matrixValue;
+        return { displayName: displayValue, isMatrix: true, parameter: primaryParam.parameter };
+      }
+    }
+
+    return null;
   };
 
   getSortedTaskRun = (tRuns: TaskRunKind[], tasks: PipelineTask[]): TaskRunKind[] => {
@@ -152,6 +190,10 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
               <NavList className="pipeline-run-logs__nav">
                 {taskRunNames.map((taskRunName) => {
                   const taskRun = taskRuns.find((t) => t.metadata.name === taskRunName);
+                  const matrixInfo = this.getMatrixDisplayInfo(taskRun);
+                  const currentTaskName =
+                    taskRun?.metadata?.labels?.[TektonResourceLabel.pipelineTask] || '-';
+
                   return (
                     <NavItem
                       key={taskRunName}
@@ -162,7 +204,14 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
                       <span ref={activeItem === taskRunName ? selectedItemRef : undefined}>
                         <ColoredStatusIcon status={taskRunStatus(taskRun)} />
                         <span className="pipeline-run-logs__namespan">
-                          {taskRun?.metadata?.labels?.[TektonResourceLabel.pipelineTask] || '-'}
+                          {currentTaskName}
+                          {matrixInfo && (
+                            <div className="pipeline-run-logs__matrix-info">
+                              <span className="pipeline-run-logs__matrix-label">
+                                {matrixInfo.displayName}
+                              </span>
+                            </div>
+                          )}
                         </span>
                       </span>
                     </NavItem>

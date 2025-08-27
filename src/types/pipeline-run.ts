@@ -119,6 +119,15 @@ export type PipelineRunParam = {
   resource?: object;
 };
 
+export type ChildReference = {
+  apiVersion: string;
+  kind: string;
+  name: string;
+  pipelineTaskName: string;
+  displayName?: string;
+  whenExpressions?: WhenExpression[];
+};
+
 export type PipelineRunStatus = {
   succeededCondition?: string;
   creationTimestamp?: string;
@@ -133,6 +142,7 @@ export type PipelineRunStatus = {
     whenExpressions?: WhenExpression[];
   }[];
   results?: TektonResultsRun[];
+  childReferences?: ChildReference[];
 };
 
 export type PipelineRunKindV1 = K8sResourceCommon & {
