@@ -10,7 +10,6 @@ import {
   WhenStatus,
 } from '@patternfly/react-topology';
 import { PipelineNodeModel } from '@patternfly/react-topology/src/pipelines/types';
-import { TaskRunLabel } from '../../../../../consts/pipelinerun';
 import { isCVEScanResult } from '../../../../../hooks/useScanResults';
 import { formatPrometheusDuration } from '../../../../../shared/components/timestamp/datetime';
 import {
@@ -23,10 +22,7 @@ import {
   PLRTaskRunStep,
   TektonResultsRun,
 } from '../../../../../types';
-import {
-  detectMatrixTasks,
-  detectMatrixParametersFromTaskRun,
-} from '../../../../../utils/matrix-pipeline-utils';
+import { detectMatrixTasks } from '../../../../../utils/matrix-pipeline-utils';
 import {
   pipelineRunStatus,
   runStatus,
@@ -163,7 +159,6 @@ export const createStepStatus = (
 // Extended type for matrix tasks
 type MatrixPipelineTaskWithStatus = PipelineTaskWithStatus & {
   originalName?: string;
-  matrixPlatform?: string;
   matrixParameter?: string;
   matrixValue?: string;
   matrixDisplayName?: string;
@@ -257,6 +252,21 @@ const sanitizeDisplayName = (displayName: string): string => {
 };
 
 /**
+ * Sanitizes a string for use as a name suffix, replacing non-alphanumeric characters with dashes
+ * and collapsing multiple consecutive dashes into single dashes
+ * @param input - The input string to sanitize
+ * @returns Sanitized string suitable for use as a name suffix
+ */
+const sanitizeNameSuffix = (input: string): string => {
+  if (!input) return '';
+  
+  return input
+    .replace(/[^a-zA-Z0-9]/g, '-') // Replace non-alphanumeric with dash
+    .replace(/-+/g, '-') // Collapse multiple consecutive dashes into single dash
+    .replace(/^-|-$/g, ''); // Remove leading and trailing dashes
+};
+
+/**
  * Looks up displayName from PipelineRun.status.childReferences for a specific TaskRun
  * @param pipelineRun - The PipelineRun containing childReferences
  * @param taskRunName - The name of the TaskRun to find displayName for
@@ -276,6 +286,84 @@ const getDisplayNameFromChildReferences = (
 
   return sanitizeDisplayName(childRef.displayName);
 };
+
+/**
+ * Creates individual matrix instance labels based on specific parameter values
+ * Each matrix instance gets its own unique label
+ */
+export const createMatrixInstanceLabel = (
+  task: PipelineTask,
+  taskRun: TaskRunKind,
+  pipelineRun: PipelineRunKind,
+  index: number,
+): string => {
+  // Priority 1: Try to get displayName from childReferences
+  const taskRunName = taskRun.metadata?.name;
+  const childRefDisplayName = taskRunName
+    ? getDisplayNameFromChildReferences(pipelineRun, taskRunName)
+    : undefined;
+
+  if (childRefDisplayName) {
+    return childRefDisplayName;
+  }
+
+  // Priority 2: Create label from actual TaskRun matrix parameter values
+  const matrixParams = (task as any).matrix?.params;
+  if (matrixParams && matrixParams.length > 0) {
+    // Get matrix parameter names from pipeline definition
+    const matrixParamNames = matrixParams.map(p => p.name);
+    
+    // Get actual parameter values from TaskRun
+    const taskRunParams = taskRun.spec?.params || [];
+    
+    // Filter to only matrix parameters and get their values
+    const matrixParamValues = taskRunParams
+      .filter(param => matrixParamNames.includes(param.name))
+      .map(param => param.value);
+    
+    // For single parameter matrices, show the specific value for this instance
+    if (matrixParams.length === 1) {
+      const param = matrixParams[0];
+      const values = Array.isArray(param.value) ? param.value : [param.value];
+      if (values[index] !== undefined) {
+        return `${values[index]}`;
+      }
+    }
+    
+    // For multiple parameter matrices, use actual TaskRun parameter values
+    const paramValues: string[] = [];
+    
+    // Calculate the total number of combinations
+    const totalCombinations = matrixParams.reduce((total, param) => {
+      const values = Array.isArray(param.value) ? param.value : [param.value];
+      return total * values.length;
+    }, 1);
+    
+    if (index < totalCombinations) {
+      // Use actual TaskRun parameter values instead of calculating combinations
+      if (matrixParamValues.length > 0) {
+        return matrixParamValues.join(', ');
+      }
+      
+      // Fallback to combination calculation if TaskRun params not available
+      let remainingIndex = index;
+      for (const param of matrixParams) {
+        const values = Array.isArray(param.value) ? param.value : [param.value];
+        const paramIndex = remainingIndex % values.length;
+        paramValues.push(`${values[paramIndex]}`);
+        remainingIndex = Math.floor(remainingIndex / values.length);
+      }
+    }
+    
+    if (paramValues.length < 4) {
+      return paramValues.join(', ');
+    }
+  }
+
+  // Priority 3: Fallback to generic instance naming
+  return `Instance ${index + 1}`;
+};
+
 const createMatrixTaskEntry = (
   task: PipelineTask,
   taskRun: TaskRunKind,
@@ -286,7 +374,7 @@ const createMatrixTaskEntry = (
 ): MatrixPipelineTaskWithStatus => {
   const matrixTask = createTaskWithStatus(task, taskRun) as MatrixPipelineTaskWithStatus;
 
-  // Try to get displayName from childReferences first, then fallback to provided matrixDisplayName
+  // Priority 1: Try to get displayName from childReferences (highest priority)
   const taskRunName = taskRun.metadata?.name;
   const childRefDisplayName = taskRunName
     ? getDisplayNameFromChildReferences(pipelineRun, taskRunName)
@@ -299,18 +387,15 @@ const createMatrixTaskEntry = (
   if (childRefDisplayName) {
     // Use displayName from childReferences (highest priority)
     displayName = childRefDisplayName;
-    nameSuffix = childRefDisplayName.replace(/[^a-zA-Z0-9]/g, '-');
+    nameSuffix = sanitizeNameSuffix(childRefDisplayName);
   } else if (matrixDisplayName) {
     // Use provided matrixDisplayName (fallback)
     displayName = sanitizeDisplayName(matrixDisplayName);
-    nameSuffix = displayName.replace(/[^a-zA-Z0-9]/g, '-');
+    nameSuffix = sanitizeNameSuffix(displayName);
   } else if (matrixValue) {
-    // For TARGET_PLATFORM, convert dashes to slashes for display
-    displayName =
-      matrixParameter === 'build.appstudio.redhat.com/target-platform'
-        ? matrixValue.replace(/-/g, '/')
-        : matrixValue;
-    nameSuffix = matrixValue.replace(/[^a-zA-Z0-9]/g, '-');
+    // Use matrixValue as display name
+    displayName = matrixValue;
+    nameSuffix = sanitizeNameSuffix(matrixValue);
   } else {
     displayName = 'unknown';
     nameSuffix = 'unknown';
@@ -326,11 +411,6 @@ const createMatrixTaskEntry = (
   matrixTask.matrixValue = matrixValue;
   matrixTask.matrixDisplayName = displayName;
   matrixTask.isMatrix = true;
-
-  // Maintain backward compatibility for TARGET_PLATFORM
-  if (matrixParameter === 'build.appstudio.redhat.com/target-platform') {
-    matrixTask.matrixPlatform = displayName;
-  }
 
   return matrixTask;
 };
@@ -355,7 +435,14 @@ export const appendStatus = (
   // Group TaskRuns by pipeline task name for processing
   const taskRunsByTaskName = new Map<string, TaskRunKind[]>();
   taskRuns?.forEach((tr) => {
-    const taskName = tr.metadata.labels?.[TektonResourceLabel.pipelineTask];
+    // Try to get task name from different possible sources
+    let taskName = tr.metadata?.labels?.[TektonResourceLabel.pipelineTask];
+    
+    // If not found in labels, try to get from pipelineTaskName field (for childReferences)
+    if (!taskName && (tr as { pipelineTaskName?: string }).pipelineTaskName) {
+      taskName = (tr as { pipelineTaskName?: string }).pipelineTaskName;
+    }
+    
     if (taskName) {
       const existingTaskRuns = taskRunsByTaskName.get(taskName) || [];
       existingTaskRuns.push(tr);
@@ -388,35 +475,28 @@ export const appendStatus = (
       return;
     }
 
-    // Check if this is a matrix task using generic detection
+    // Check if this is a matrix task using multiple detection methods:
+    // 1. Generic matrix detection from TaskRuns
+    // 2. Multiple TaskRuns for this task (indicating it's a matrix task)
     const matrixInfo = matrixTasksMap.get(task.name);
+    const hasMultipleTaskRuns = taskRunsForTask.length > 1;
 
-    if (matrixInfo?.isMatrix) {
+    if (matrixInfo?.isMatrix || hasMultipleTaskRuns) {
       // Matrix task detected - create one entry per matrix instance
-      taskRunsForTask.forEach((taskRun) => {
-        // Get matrix parameters for this specific TaskRun
-        const matrixParams = detectMatrixParametersFromTaskRun(taskRun);
-
-        // Use the first matrix parameter for display (backward compatibility)
-        const primaryParam = matrixParams[0];
-
-        if (primaryParam) {
-          const matrixValue = taskRun.metadata.annotations?.[primaryParam.parameter];
-
-          const matrixTask = createMatrixTaskEntry(
-            task,
-            taskRun,
-            pipelineRun,
-            primaryParam.parameter,
-            matrixValue,
-            primaryParam.displayName,
-          );
-          result.push(matrixTask);
-        } else {
-          // Fallback to regular task if no matrix parameters found
-          const regularTask = createTaskWithStatus(task, taskRun);
-          result.push(regularTask);
-        }
+      // This shows matrix tasks as individual parallel nodes while maintaining proper dependency resolution
+      taskRunsForTask.forEach((taskRun, index) => {
+        // Use createMatrixInstanceLabel to generate meaningful labels
+        const matrixLabel = createMatrixInstanceLabel(task, taskRun, pipelineRun, index);
+        
+        // Create matrix task entries with meaningful labels
+        const matrixTask = createMatrixTaskEntry(
+          task,
+          taskRun,
+          pipelineRun,
+          undefined, // Let the function determine the parameter name
+          matrixLabel, // Use the generated meaningful label
+        );
+        result.push(matrixTask);
       });
     } else {
       // Regular task - create single entry
@@ -478,7 +558,7 @@ const getNodeLevel = (
   node: PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType>,
   allNodes: PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType>[],
 ) => {
-  const children = allNodes.filter((n) => n.runAfterTasks?.includes(node.label));
+  const children = allNodes.filter((n) => n.runAfterTasks?.includes(node.id));
   if (!children.length) {
     return 0;
   }
@@ -517,7 +597,7 @@ const hasParentDep = (
         return true;
       }
     }
-    if (depNode.runAfterTasks?.includes(dep) || hasParentDep(dep, depNode.runAfterTasks, nodes)) {
+    if (depNode?.runAfterTasks?.includes(dep) || hasParentDep(dep, depNode?.runAfterTasks || [], nodes)) {
       return true;
     }
   }
@@ -532,14 +612,18 @@ const expandMatrixDependencies = (deps: string[], taskList: PipelineTaskWithStat
     // Find all matrix instances of this dependency
     const matrixInstances = taskList.filter((task) => {
       const matrixTask = task as MatrixPipelineTaskWithStatus;
-      return matrixTask.originalName === dep || task.name === dep;
+      // Check if this task is a matrix instance of the dependency
+      return matrixTask.originalName === dep;
     });
 
     if (matrixInstances.length > 1) {
       // This is a matrix task - add all instances
       matrixInstances.forEach((instance) => expandedDeps.push(instance.name));
+    } else if (matrixInstances.length === 1) {
+      // Single matrix instance - add it
+      expandedDeps.push(matrixInstances[0].name);
     } else {
-      // Regular task or single instance
+      // Regular task - add as is
       expandedDeps.push(dep);
     }
   });
@@ -556,6 +640,8 @@ const getGraphDataModel = (
   nodes: (PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType> | PipelineNodeModel)[];
   edges: PipelineEdgeModel[];
 } => {
+  
+
   const taskList = appendStatus(pipeline, pipelineRun, taskRuns);
 
   const nodes: PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType>[] = taskList.map(
@@ -585,22 +671,18 @@ const getGraphDataModel = (
       const expandedRunAfterTasks = expandMatrixDependencies(runAfterTasks, taskList);
 
       // For matrix tasks, use matrixDisplayName for better labels
+      // Only apply matrix formatting if this is actually a matrix task
       const matrixTask = task as MatrixPipelineTaskWithStatus;
-      const displayName = matrixTask.matrixDisplayName
+      const displayName = matrixTask.isMatrix && matrixTask.matrixDisplayName
         ? `${matrixTask.originalName || task.name} (${matrixTask.matrixDisplayName})`
-        : matrixTask.matrixPlatform
-          ? `${matrixTask.originalName} (${matrixTask.matrixPlatform})`
-          : task.name;
+        : task.name;
 
-      // For matrix tasks, find the specific TaskRun for this platform
+      // Find TaskRun for this task
       let taskRunForTask: TaskRunKind | undefined;
-      if (matrixTask.matrixPlatform) {
-        // Matrix task - find TaskRun with matching platform label
-        const platformLabel = matrixTask.matrixPlatform.replace(/\//g, '-');
+      if (matrixTask.isMatrix && matrixTask.originalName) {
+        // Matrix task - find TaskRun by original name
         taskRunForTask = taskRuns.find(
-          (tr) =>
-            tr.metadata.labels[TektonResourceLabel.pipelineTask] === matrixTask.originalName &&
-            tr.metadata.labels[TaskRunLabel.TARGET_PLATFORM] === platformLabel,
+          (tr) => tr.metadata.labels[TektonResourceLabel.pipelineTask] === matrixTask.originalName,
         );
       } else {
         // Regular task - find by task name
@@ -609,8 +691,12 @@ const getGraphDataModel = (
         );
       }
 
+      // For matrix tasks, use the instance-specific name as the ID to show individual parallel nodes
+      // For regular tasks, use the task name as is
+      const nodeId = task.name;
+
       return {
-        id: task.name,
+        id: nodeId,
         type: PipelineRunNodeType.TASK_NODE,
         label: displayName,
         runAfterTasks: expandedRunAfterTasks,
@@ -637,6 +723,12 @@ const getGraphDataModel = (
         (dep) => !hasParentDep(dep, taskNode.runAfterTasks, nodes),
       )),
   );
+
+  // Validate that all runAfterTasks references point to existing nodes
+  const validNodeIds = new Set(nodes.map(n => n.id));
+  nodes.forEach((taskNode) => {
+    taskNode.runAfterTasks = taskNode.runAfterTasks.filter(dep => validNodeIds.has(dep));
+  });
 
   // Set the level and width of each node
   nodes.forEach((taskNode) => {

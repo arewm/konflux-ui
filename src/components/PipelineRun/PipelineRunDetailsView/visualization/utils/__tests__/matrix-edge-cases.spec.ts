@@ -79,6 +79,9 @@ describe('Matrix Edge Cases', () => {
   it('should handle missing childReferences gracefully', () => {
     const pipelineRun = createMockPipelineRun({
       status: {
+        pipelineSpec: {
+          tasks: [{ name: 'build', taskRef: { name: 'build-task' } }],
+        },
         childReferences: [], // No childReferences
       },
     });
@@ -109,6 +112,9 @@ describe('Matrix Edge Cases', () => {
   it('should handle security sanitization of display names', () => {
     const pipelineRun = createMockPipelineRun({
       status: {
+        pipelineSpec: {
+          tasks: [{ name: 'build', taskRef: { name: 'build-task' } }],
+        },
         childReferences: [
           {
             apiVersion: 'tekton.dev/v1',
@@ -136,6 +142,9 @@ describe('Matrix Edge Cases', () => {
 
     const pipelineRun = createMockPipelineRun({
       status: {
+        pipelineSpec: {
+          tasks: [{ name: 'build', taskRef: { name: 'build-task' } }],
+        },
         childReferences: [
           {
             apiVersion: 'tekton.dev/v1',

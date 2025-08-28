@@ -33,6 +33,28 @@ const PipelineRunVisualization: React.FC<{
     return <GraphErrorState errors={[error]} />;
   }
   if (!model && !error) {
+    // Check if the issue is missing pipeline spec
+    if (!pipelineRun?.status?.pipelineSpec && !pipelineRun?.spec?.pipelineSpec) {
+      return (
+        <div className="pipelinerun-graph-error" data-test="pipelinerun-graph-error">
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <h3>Pipeline Visualization Unavailable</h3>
+            <p>
+              The pipeline specification is missing from this pipeline run. This commonly happens when:
+            </p>
+            <ul style={{ textAlign: 'left', display: 'inline-block' }}>
+              <li>The pipeline run was created without embedding the pipeline spec</li>
+              <li>The pipeline was deleted after the run was created</li>
+              <li>There was an issue during pipeline run creation</li>
+            </ul>
+            <p>
+              <strong>Available Information:</strong> {taskRuns?.length || 0} task runs are available, 
+              but the pipeline structure cannot be determined without the pipeline specification.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
   return (

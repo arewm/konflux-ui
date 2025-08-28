@@ -240,6 +240,7 @@ const remainingPipelinerunFields = [
   'records.data.value.status.pipelineSpec.tasks',
   'records.data.value.status.pipelineSpec.finally',
   'records.data.value.status.pipelineResults',
+  'records.data.value.status.childReferences',
 ];
 
 export const createTektonResultsUrl = (

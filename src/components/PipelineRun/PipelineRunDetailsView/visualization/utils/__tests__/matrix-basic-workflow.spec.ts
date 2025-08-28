@@ -82,6 +82,12 @@ describe('Matrix Basic Workflow', () => {
   it('should handle basic multi-platform build matrix', () => {
     const pipelineRun = createMockPipelineRun({
       status: {
+        pipelineSpec: {
+          tasks: [
+            { name: 'build', taskRef: { name: 'build-task' } },
+            { name: 'test', taskRef: { name: 'test-task' }, runAfter: ['build'] },
+          ],
+        },
         childReferences: [
           {
             apiVersion: 'tekton.dev/v1',
@@ -127,6 +133,12 @@ describe('Matrix Basic Workflow', () => {
   it('should handle mixed matrix and regular tasks', () => {
     const pipelineRun = createMockPipelineRun({
       status: {
+        pipelineSpec: {
+          tasks: [
+            { name: 'build', taskRef: { name: 'build-task' } },
+            { name: 'test', taskRef: { name: 'test-task' }, runAfter: ['build'] },
+          ],
+        },
         childReferences: [
           {
             apiVersion: 'tekton.dev/v1',

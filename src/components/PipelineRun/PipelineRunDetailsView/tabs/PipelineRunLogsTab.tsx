@@ -16,12 +16,23 @@ const PipelineRunLogsTab: React.FC = () => {
   const [pipelineRun, loaded, error] = usePipelineRun(namespace, pipelineRunName);
   const [taskRuns, taskRunsLoaded, taskRunError] = useTaskRuns(namespace, pipelineRunName);
   const [activeTask, setActiveTask, unSetActiveTask] = useSearchParam('task', undefined);
+  const [, setActiveIndex, unSetActiveIndex] = useSearchParam('index', undefined);
 
   const handleActiveTaskChange = React.useCallback(
-    (value: string | undefined) => {
-      value ? setActiveTask(value) : unSetActiveTask();
+    (taskName: string, index?: number) => {
+      if (taskName) {
+        setActiveTask(taskName);
+        if (index !== undefined) {
+          setActiveIndex(index.toString());
+        } else {
+          unSetActiveIndex();
+        }
+      } else {
+        unSetActiveTask();
+        unSetActiveIndex();
+      }
     },
-    [setActiveTask, unSetActiveTask],
+    [setActiveTask, unSetActiveTask, setActiveIndex, unSetActiveIndex],
   );
 
   const loadError = error || taskRunError;
