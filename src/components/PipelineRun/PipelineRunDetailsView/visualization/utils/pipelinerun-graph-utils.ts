@@ -486,8 +486,15 @@ export const appendStatus = (
 
     if (matrixInfo?.isMatrix || hasMultipleTaskRuns) {
       // Matrix task detected - create one entry per matrix instance
-      // This shows matrix tasks as individual parallel nodes while maintaining proper dependency resolution
-      taskRunsForTask.forEach((taskRun, index) => {
+      // Sort TaskRuns by matrix instance index for consistent ordering (like logs page)
+      const sortedTaskRuns = [...taskRunsForTask].sort((a, b) => {
+        const aIndex = getMatrixInstanceIndex(a);
+        const bIndex = getMatrixInstanceIndex(b);
+        return aIndex - bIndex; // Sort by index: 0, 1, 2, etc.
+      });
+      
+      // Create matrix tasks in sorted order
+      sortedTaskRuns.forEach((taskRun, index) => {
         // Use createMatrixInstanceLabel to generate meaningful labels
         const matrixLabel = createMatrixInstanceLabel(task, taskRun, pipelineRun, index);
         
@@ -511,6 +518,38 @@ export const appendStatus = (
   });
 
   return result;
+};
+
+/**
+ * Extracts the matrix instance index from a TaskRun name
+ * This matches the logic used in the logs page for consistent sorting
+ */
+export const getMatrixInstanceIndex = (taskRun: TaskRunKind): number => {
+  // Priority 1: Try to get the actual Tekton matrix index from the TaskRun
+  if (taskRun.metadata?.labels?.[TektonResourceLabel.pipelineTask]) {
+    // Check if there's a Tekton matrix index label
+    const tektonMatrixIndex = taskRun.metadata?.labels?.['tekton.dev/matrix-index'];
+    if (tektonMatrixIndex !== undefined) {
+      const index = parseInt(tektonMatrixIndex, 10);
+      if (!isNaN(index)) {
+        return index;
+      }
+    }
+  }
+
+  // Priority 2: Extract index from the TaskRun name (e.g., "task-name-0" → index 0)
+  // This is the most reliable method as Tekton assigns these indices deterministically
+  const nameIndexMatch = taskRun.metadata?.name?.match(/-(\d+)$/);
+  if (nameIndexMatch) {
+    const extractedIndex = parseInt(nameIndexMatch[1], 10);
+    if (!isNaN(extractedIndex)) {
+      return extractedIndex;
+    }
+  }
+
+  // If we can't extract the index, something is wrong with the TaskRun data
+  // Return 0 as a safe default to maintain sorting stability
+  return 0;
 };
 
 export const taskHasWhenExpression = (task: PipelineTask): boolean => task?.when?.length > 0;

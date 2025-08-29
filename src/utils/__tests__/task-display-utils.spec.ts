@@ -1,4 +1,5 @@
 import { getTaskDisplayInfo } from '../task-display-utils';
+import { getMatrixInstanceIndex } from '../../components/PipelineRun/PipelineRunDetailsView/visualization/utils/pipelinerun-graph-utils';
 import { PipelineTask, TaskRunKind, PipelineRunKind } from '../../types';
 
 describe('task-display-utils', () => {
@@ -91,6 +92,74 @@ describe('task-display-utils', () => {
       expect(result.taskName).toBe('build-task');
       expect(result.additionalInfo).toBeUndefined();
       expect(result.displayString).toBe('build-task');
+    });
+  });
+
+  describe('getMatrixInstanceIndex', () => {
+    it('should extract matrix index from TaskRun name with numeric suffix', () => {
+      const taskRun: TaskRunKind = {
+        metadata: {
+          name: 'build-task-linux-x86-64-0',
+          labels: {},
+        },
+      } as any;
+
+      const result = getMatrixInstanceIndex(taskRun);
+      expect(result).toBe(0);
+    });
+
+    it('should extract matrix index from TaskRun name with higher index', () => {
+      const taskRun: TaskRunKind = {
+        metadata: {
+          name: 'security-scan-virus-5',
+          labels: {},
+        },
+      } as any;
+
+      const result = getMatrixInstanceIndex(taskRun);
+      expect(result).toBe(5);
+    });
+
+    it('should handle TaskRun names without numeric suffix', () => {
+      const taskRun: TaskRunKind = {
+        metadata: {
+          name: 'regular-task',
+          labels: {},
+        },
+      } as any;
+
+      const result = getMatrixInstanceIndex(taskRun);
+      expect(result).toBe(0);
+    });
+
+    it('should prioritize valid Tekton matrix index label over name extraction', () => {
+      const taskRun: TaskRunKind = {
+        metadata: {
+          name: 'build-task-3',
+          labels: {
+            'tekton.dev/pipelineTask': 'build-task',
+            'tekton.dev/matrix-index': '1',
+          },
+        },
+      } as any;
+
+      const result = getMatrixInstanceIndex(taskRun);
+      expect(result).toBe(1);
+    });
+
+    it('should handle invalid Tekton matrix index label gracefully', () => {
+      const taskRun: TaskRunKind = {
+        metadata: {
+          name: 'build-task-2',
+          labels: {
+            'tekton.dev/pipelineTask': 'build-task',
+            'tekton.dev/matrix-index': 'invalid',
+          },
+        },
+      } as any;
+
+      const result = getMatrixInstanceIndex(taskRun);
+      expect(result).toBe(2); // Falls back to name extraction when label is invalid
     });
   });
 });
