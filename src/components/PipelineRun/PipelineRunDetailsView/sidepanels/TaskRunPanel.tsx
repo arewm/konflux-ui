@@ -17,19 +17,45 @@ import TaskRunLogs from '../../../TaskRuns/TaskRunLogs';
 import { PipelineRunNodeData } from '../visualization/types';
 import TaskRunDetails from './TaskRunDetails';
 
+import { PipelineRunKind, TaskRunKind } from '../../../../types';
+
 import './TaskRunPanel.scss';
 
 type Props = {
   onClose: () => void;
   taskNode: GraphElement<ElementModel, PipelineRunNodeData>;
+  pipelineRun: PipelineRunKind;
+  taskRuns: TaskRunKind[];
 };
 
-const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({ taskNode, onClose }) => {
+const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({ 
+  taskNode, 
+  onClose, 
+  pipelineRun, 
+  taskRuns 
+}) => {
   const task = taskNode.getData().task;
   const taskRun = taskNode.getData().taskRun;
   const { status } = taskNode.getData();
   const namespace = useNamespace();
   const applicationName = taskRun?.metadata?.labels[PipelineRunLabel.APPLICATION];
+
+  // Get the original task name (for matrix tasks, use originalName; for regular tasks, use name)
+  const originalTaskName = React.useMemo(() => {
+    const matrixTask = task as any;
+    return matrixTask.isMatrix && matrixTask.originalName ? matrixTask.originalName : task.name;
+  }, [task]);
+
+  // Check if we have a displayName from childReferences (same logic as logs page)
+  const displayName = React.useMemo(() => {
+    if (taskRun && pipelineRun?.status?.childReferences) {
+      const childRef = pipelineRun.status.childReferences.find(
+        (ref: any) => ref.name === taskRun.metadata?.name
+      );
+      return childRef?.displayName;
+    }
+    return undefined;
+  }, [taskRun, pipelineRun]);
 
   return (
     <>
@@ -44,10 +70,10 @@ const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({ taskNode, onCl
                   taskRunName: taskRun.metadata?.name,
                 })}
               >
-                {task.name}
+                {originalTaskName}
               </Link>
             ) : (
-              task.name
+              originalTaskName
             )}{' '}
             <StatusIconWithTextLabel status={status} />
           </span>
@@ -56,6 +82,19 @@ const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({ taskNode, onCl
           </DrawerActions>
         </DrawerHead>
       </div>
+
+      {/* Show displayName if available (same styling as logs page) */}
+      {displayName && (
+        <div className="task-run-panel__display-name" style={{ 
+          padding: '0.5rem 1rem', 
+          color: 'var(--pf-v5-global--Color--200)',
+          fontSize: 'var(--pf-v5-global--FontSize--sm)',
+          fontStyle: 'italic',
+          opacity: 0.8
+        }}>
+          {displayName}
+        </div>
+      )}
 
       <div className="task-run-panel__tabs">
         <Tabs defaultActiveKey="details" unmountOnExit className="">

@@ -66,6 +66,8 @@ export type MatrixPipelineTaskWithStatus = PipelineTaskWithStatus & {
     displayName: string;
     isKnownParameter: boolean;
   }>;
+  /** The specific TaskRun for this matrix instance */
+  taskRun?: TaskRunKind;
 };
 
 export type PipelineRunNodeModel<D extends PipelineRunNodeData, T> = Omit<

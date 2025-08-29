@@ -411,6 +411,9 @@ const createMatrixTaskEntry = (
   matrixTask.matrixValue = matrixValue;
   matrixTask.matrixDisplayName = displayName;
   matrixTask.isMatrix = true;
+  
+  // Store the specific TaskRun for this matrix instance
+  (matrixTask as any).taskRun = taskRun;
 
   return matrixTask;
 };
@@ -496,6 +499,7 @@ export const appendStatus = (
           undefined, // Let the function determine the parameter name
           matrixLabel, // Use the generated meaningful label
         );
+        
         result.push(matrixTask);
       });
     } else {
@@ -680,10 +684,8 @@ const getGraphDataModel = (
       // Find TaskRun for this task
       let taskRunForTask: TaskRunKind | undefined;
       if (matrixTask.isMatrix && matrixTask.originalName) {
-        // Matrix task - find TaskRun by original name
-        taskRunForTask = taskRuns.find(
-          (tr) => tr.metadata.labels[TektonResourceLabel.pipelineTask] === matrixTask.originalName,
-        );
+        // Matrix task - use the TaskRun that was stored during creation
+        taskRunForTask = (matrixTask as any).taskRun;
       } else {
         // Regular task - find by task name
         taskRunForTask = taskRuns.find(

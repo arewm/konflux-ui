@@ -13,11 +13,26 @@ jest.mock('@patternfly/react-topology', () => ({
 const useVisualizationControllerMock = useVisualizationController as jest.Mock;
 const useVisualizationStateMock = useVisualizationState as jest.Mock;
 
+// Mock data for tests
+const mockPipelineRun = {
+  metadata: {
+    name: 'test-pipeline-run',
+    namespace: 'test-namespace',
+  },
+  status: {
+    pipelineSpec: {
+      tasks: [],
+    },
+  },
+} as any;
+
+const mockTaskRuns: any[] = [];
+
 describe('PipelineRunSidePanel', () => {
   it('should render nothing by default', () => {
     const setPropsFn = jest.fn();
 
-    render(<PipelineRunSidePanel />, {
+    render(<PipelineRunSidePanel pipelineRun={mockPipelineRun} taskRuns={mockTaskRuns} />, {
       wrapper: ({ children }) => (
         <SidePanelContext.Provider value={{ setProps: setPropsFn, close: () => {} }}>
           {children}
@@ -41,7 +56,7 @@ describe('PipelineRunSidePanel', () => {
 
     const setPropsFn = jest.fn();
 
-    render(<PipelineRunSidePanel />, {
+    render(<PipelineRunSidePanel pipelineRun={mockPipelineRun} taskRuns={mockTaskRuns} />, {
       wrapper: ({ children }) => (
         <SidePanelContext.Provider value={{ setProps: setPropsFn, close: () => {} }}>
           {children}
@@ -67,7 +82,11 @@ describe('PipelineRunSidePanel', () => {
 
     const setPropsFn = jest.fn();
 
-    render(<PipelineRunSidePanel scrollIntoView={scrollIntoViewFn} />, {
+    render(<PipelineRunSidePanel 
+      scrollIntoView={scrollIntoViewFn} 
+      pipelineRun={mockPipelineRun} 
+      taskRuns={mockTaskRuns} 
+    />, {
       wrapper: ({ children }) => (
         <SidePanelContext.Provider value={{ setProps: setPropsFn, close: () => {} }}>
           {children}
