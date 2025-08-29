@@ -26,49 +26,67 @@ interface PipelineRunLogsProps {
 interface PipelineRunLogsState {
   activeItem: string;
   navUntouched: boolean;
+  lastUrl: string;
 }
 class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunLogsState> {
   constructor(props: PipelineRunLogsProps) {
     super(props);
-    this.state = { activeItem: null, navUntouched: true };
+    this.state = { 
+      activeItem: null, 
+      navUntouched: true,
+      lastUrl: window.location.search 
+    };
   }
 
   componentDidMount() {
-    const { activeTask, taskRuns } = this.props;
-    if (activeTask && taskRuns.length > 0) {
-      // Find the task by name
-      const taskName = activeTask;
-      
-      // Check if we have an index parameter in the URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const indexParam = urlParams.get('index');
-      
-      if (indexParam !== null) {
-        // We have an index parameter, find the specific matrix instance
-        const matrixTaskRuns = taskRuns.filter(tr => 
-          tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskName
-        );
+    const { activeTask, taskRuns, obj } = this.props;
+    
+    if (taskRuns.length > 0) {
+      if (activeTask) {
+        // Find the task by name
+        const taskName = activeTask;
         
-        // Sort by the index extracted from TaskRun name
-        matrixTaskRuns.sort((a, b) => {
-          const aMatch = a.metadata.name.match(/-(\d+)$/);
-          const bMatch = b.metadata.name.match(/-(\d+)$/);
-          const aIndex = aMatch ? parseInt(aMatch[1], 10) : 0;
-          const bIndex = bMatch ? parseInt(bMatch[1], 10) : 0;
-          return aIndex - bIndex;
-        });
+        // Check if we have an index parameter in the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const indexParam = urlParams.get('index');
         
-        const targetIndex = parseInt(indexParam, 10);
-        if (matrixTaskRuns[targetIndex]) {
-          this.setState({ activeItem: matrixTaskRuns[targetIndex].metadata.name });
+        if (indexParam !== null) {
+          // We have an index parameter, find the specific matrix instance
+          const matrixTaskRuns = taskRuns.filter(tr => 
+            tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskName
+          );
+          
+          // Sort by the index extracted from TaskRun name
+          matrixTaskRuns.sort((a, b) => {
+            const aMatch = a.metadata.name.match(/-(\d+)$/);
+            const bMatch = b.metadata.name.match(/-(\d+)$/);
+            const aIndex = aMatch ? parseInt(aMatch[1], 10) : 0;
+            const bIndex = bMatch ? parseInt(bMatch[1], 10) : 0;
+            return aIndex - bIndex;
+          });
+          
+          const targetIndex = parseInt(indexParam, 10);
+          if (matrixTaskRuns[targetIndex]) {
+            this.setState({ activeItem: matrixTaskRuns[targetIndex].metadata.name });
+          }
+        } else {
+          // No index parameter, find the first TaskRun for this task
+          const firstTaskRun = taskRuns.find(tr => 
+            tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskName
+          );
+          if (firstTaskRun) {
+            this.setState({ activeItem: firstTaskRun.metadata.name });
+          }
         }
       } else {
-        // No index parameter, find the first TaskRun for this task
-        const firstTaskRun = taskRuns.find(tr => 
-          tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskName
-        );
-        if (firstTaskRun) {
-          this.setState({ activeItem: firstTaskRun.metadata.name });
+        // No activeTask specified, use fallback logic to select a default TaskRun
+        const sortedTaskRuns = this.getSortedTaskRun(taskRuns, [
+          ...(obj?.status?.pipelineSpec?.tasks || []),
+          ...(obj?.status?.pipelineSpec?.finally || []),
+        ]);
+        const defaultActiveItem = this.getActiveTaskRun(sortedTaskRuns, activeTask);
+        if (defaultActiveItem) {
+          this.setState({ activeItem: defaultActiveItem });
         }
       }
     }
@@ -83,6 +101,58 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
       ]);
       const activeItem = this.getActiveTaskRun(sortedTaskRuns, activeTask);
       this.state.navUntouched && this.setState({ activeItem });
+    }
+  }
+
+  componentDidUpdate(prevProps: PipelineRunLogsProps, prevState: PipelineRunLogsState) {
+    // Check if URL has changed and update activeItem accordingly
+    const currentUrl = window.location.search;
+    const prevUrl = this.state.lastUrl || '';
+    
+    if (currentUrl !== prevUrl) {
+      this.setState({ lastUrl: currentUrl });
+      
+      // Parse the new URL and update activeItem if needed
+      const urlParams = new URLSearchParams(currentUrl);
+      const taskParam = urlParams.get('task');
+      const indexParam = urlParams.get('index');
+      
+      if (taskParam && this.props.taskRuns.length > 0) {
+        if (indexParam !== null) {
+          // We have an index parameter, find the specific matrix instance
+          const matrixTaskRuns = this.props.taskRuns.filter(tr => 
+            tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskParam
+          );
+          
+          // Sort by the index extracted from TaskRun name
+          matrixTaskRuns.sort((a, b) => {
+            const aMatch = a.metadata.name.match(/-(\d+)$/);
+            const bMatch = b.metadata.name.match(/-(\d+)$/);
+            const aIndex = aMatch ? parseInt(aMatch[1], 10) : 0;
+            const bIndex = bMatch ? parseInt(bMatch[1], 10) : 0;
+            return aIndex - bIndex;
+          });
+          
+          const targetIndex = parseInt(indexParam, 10);
+          if (matrixTaskRuns[targetIndex]) {
+            this.setState({ 
+              activeItem: matrixTaskRuns[targetIndex].metadata.name,
+              navUntouched: false 
+            });
+          }
+        } else {
+          // No index parameter, find the first TaskRun for this task
+          const firstTaskRun = this.props.taskRuns.find(tr => 
+            tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === taskParam
+          );
+          if (firstTaskRun) {
+            this.setState({ 
+              activeItem: firstTaskRun.metadata.name,
+              navUntouched: false 
+            });
+          }
+        }
+      }
     }
   }
 
