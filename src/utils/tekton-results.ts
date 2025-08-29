@@ -255,7 +255,7 @@ export const createTektonResultsUrl = (
     ['order_by']: 'create_time desc',
     ['page_size']: `${Math.max(
       MINIMUM_PAGE_SIZE,
-      Math.min(MAXIMUM_PAGE_SIZE, options?.limit >= 0 ? options.limit : options?.pageSize ?? 30),
+      Math.min(MAXIMUM_PAGE_SIZE, options?.limit >= 0 ? options.limit : options?.pageSize ?? 100),
     )}`,
     ...(nextPageToken ? { ['page_token']: nextPageToken } : {}),
     // get partial response with required fields
@@ -301,12 +301,38 @@ export const getFilteredRecord = async <R extends K8sResourceCommon>(
   const value = await (async (): Promise<[R[], RecordsList]> => {
     try {
       let list: RecordsList = await commonFetchJSON(url);
+      
+      // If no limit is specified and there are more pages, fetch all remaining pages
+      if (!options?.limit && list?.nextPageToken) {
+        const allRecords = [...(list?.records ?? [])];
+        let currentPageToken = list.nextPageToken;
+        
+        // Fetch all remaining pages
+        while (currentPageToken) {
+          const nextPageUrl = createTektonResultsUrl(namespace, dataTypes, filter, options, currentPageToken);
+          const nextPage: RecordsList = await commonFetchJSON(nextPageUrl);
+          
+          if (nextPage?.records) {
+            allRecords.push(...nextPage.records);
+          }
+          
+          currentPageToken = nextPage?.nextPageToken || null;
+        }
+        
+        // Update the list with all records and no next page token
+        list = {
+          nextPageToken: null,
+          records: allRecords,
+        };
+      }
+      
       if (options?.limit >= 0) {
         list = {
           nextPageToken: null,
           records: (list?.records ?? []).slice(0, options.limit),
         };
       }
+      
       return [(list?.records ?? []).map((result) => decodeValueJson(result.data.value)), list];
     } catch (e) {
       // return an empty response if we get a 404 error

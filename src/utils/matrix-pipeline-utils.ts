@@ -37,6 +37,8 @@ export const detectMatrixTasks = (taskRuns: TaskRunKind[]): Map<string, MatrixTa
       const existing = taskRunsByTaskName.get(taskName) || [];
       existing.push(taskRun);
       taskRunsByTaskName.set(taskName, existing);
+    } else {
+      console.warn(`⚠️ detectMatrixTasks: TaskRun ${taskRun.metadata.name} could not be mapped to a pipeline task!`);
     }
   });
 

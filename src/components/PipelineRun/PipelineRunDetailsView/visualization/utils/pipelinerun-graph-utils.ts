@@ -431,12 +431,13 @@ export const appendStatus = (
 
   const tasks = (isFinallyTasks ? pipeline.spec.finally : pipeline.spec.tasks) || [];
   const overallPipelineRunStatus = pipelineRunStatus(pipelineRun);
-
+  
   // Use generic matrix detection to identify matrix tasks
   const matrixTasksMap = detectMatrixTasks(taskRuns || []);
 
   // Group TaskRuns by pipeline task name for processing
   const taskRunsByTaskName = new Map<string, TaskRunKind[]>();
+  
   taskRuns?.forEach((tr) => {
     // Try to get task name from different possible sources
     let taskName = tr.metadata?.labels?.[TektonResourceLabel.pipelineTask];
@@ -450,13 +451,15 @@ export const appendStatus = (
       const existingTaskRuns = taskRunsByTaskName.get(taskName) || [];
       existingTaskRuns.push(tr);
       taskRunsByTaskName.set(taskName, existingTaskRuns);
+    } else {
+      console.warn(`⚠️ TaskRun ${tr.metadata.name} could not be mapped to a pipeline task!`);
     }
   });
 
   // Process each pipeline task, expanding matrix tasks into multiple entries
   const result: PipelineTaskWithStatus[] = [];
-
-  tasks.forEach((task) => {
+  
+    tasks.forEach((task) => {
     if (!pipelineRun?.status) {
       result.push({ ...task, status: { reason: runStatus.Pending } });
       return;
@@ -467,7 +470,7 @@ export const appendStatus = (
     }
 
     const taskRunsForTask = taskRunsByTaskName.get(task.name) || [];
-
+    
     // If no TaskRuns found, create a single task entry
     if (taskRunsForTask.length === 0) {
       const isSkipped = !!pipelineRun.status.skippedTasks?.find((t) => t.name === task.name);
@@ -683,8 +686,6 @@ const getGraphDataModel = (
   nodes: (PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType> | PipelineNodeModel)[];
   edges: PipelineEdgeModel[];
 } => {
-  
-
   const taskList = appendStatus(pipeline, pipelineRun, taskRuns);
 
   const nodes: PipelineRunNodeModel<PipelineRunNodeData, PipelineRunNodeType>[] = taskList.map(
@@ -785,26 +786,29 @@ const getGraphDataModel = (
   });
 
   const finallyTaskList = appendStatus(pipeline, pipelineRun, taskRuns, true);
-
   const maxFinallyNodeName =
     finallyTaskList.sort((a, b) => b.name.length - a.name.length)[0]?.name || '';
-  const finallyNodes = finallyTaskList.map((fTask) => ({
-    type: PipelineRunNodeType.FINALLY_NODE,
-    id: fTask.name,
-    label: fTask.name,
-    runAfterTasks: [],
-    width: getLabelWidth(maxFinallyNodeName),
-    height: DEFAULT_NODE_HEIGHT,
-    data: {
-      namespace: pipelineRun.metadata.namespace,
-      status: fTask.status.reason,
-      whenStatus: taskWhenStatus(fTask),
-      task: fTask,
-      taskRun: taskRuns.find(
-        (tr) => tr.metadata.labels[TektonResourceLabel.pipelineTask] === fTask.name,
-      ),
-    },
-  }));
+  const finallyNodes = finallyTaskList.map((fTask) => {
+    const finallyTaskRun = taskRuns.find(
+      (tr) => tr.metadata.labels[TektonResourceLabel.pipelineTask] === fTask.name,
+    );
+    
+    return {
+      type: PipelineRunNodeType.FINALLY_NODE,
+      id: fTask.name,
+      label: fTask.name,
+      runAfterTasks: [],
+      width: getLabelWidth(maxFinallyNodeName),
+      height: DEFAULT_NODE_HEIGHT,
+      data: {
+        namespace: pipelineRun.metadata.namespace,
+        status: fTask.status.reason,
+        whenStatus: taskWhenStatus(fTask),
+        task: fTask,
+        taskRun: finallyTaskRun,
+      },
+    };
+  });
   const finallyGroup = finallyNodes.length
     ? [
         {
@@ -832,6 +836,8 @@ const getGraphDataModel = (
   );
   const allNodes = [...nodes, ...spacerNodes, ...finallyNodes, ...finallyGroup];
   const hasWhenExpression = nodesHasWhenExpression(allNodes);
+  
+
 
   return {
     graph: {
@@ -853,7 +859,10 @@ export const getPipelineRunDataModel = (pipelineRun: PipelineRunKind, taskRuns: 
   if (!pipelineRun?.status?.pipelineSpec) {
     return null;
   }
-  return getGraphDataModel(getPipelineFromPipelineRun(pipelineRun), pipelineRun, taskRuns);
+  
+  const pipeline = getPipelineFromPipelineRun(pipelineRun);
+  
+  return getGraphDataModel(pipeline, pipelineRun, taskRuns);
 };
 
 export const isTaskNode = (e?: GraphElement): e is Node<ElementModel, PipelineRunNodeData> =>
