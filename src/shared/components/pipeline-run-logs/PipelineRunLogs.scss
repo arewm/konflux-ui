@@ -50,6 +50,10 @@
   &__matrix-label {
     font-style: italic;
     opacity: 0.8;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
   }
   &__log {
     height: 100%;

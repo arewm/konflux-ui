@@ -99,13 +99,31 @@ const useRuns = <Kind extends K8sResourceCommon>(
   const trOptions: typeof optionsMemo = React.useMemo(() => {
     if (optionsMemo?.name) {
       const { name, ...rest } = optionsMemo;
+      
+      // For TaskRuns, filter by the PipelineRun they belong to via ownerReferences
+      // For PipelineRuns, filter by their own name
+      let filter;
+      if (groupVersionKind === TaskRunGroupVersionKind) {
+        // Try multiple approaches to find TaskRuns for a PipelineRun
+        // 1. First try ownerReferences (most reliable)
+        // 2. Fallback to label-based filtering if ownerReferences doesn't work
+        filter = OR(
+          EQ('data.metadata.ownerReferences[0].name', name),
+          EQ('data.metadata.labels["tekton.dev/pipelineRun"]', name)
+        );
+      } else {
+        filter = EQ('data.metadata.name', name);
+      }
+        
+
+      
       return {
         ...rest,
-        filter: EQ('data.metadata.name', name),
+        filter,
       };
     }
     return optionsMemo;
-  }, [optionsMemo]);
+  }, [optionsMemo, groupVersionKind]);
 
   // tekton-results includes items in etcd, therefore options must use the same limit
   // these duplicates will later be de-duped
@@ -120,6 +138,8 @@ const useRuns = <Kind extends K8sResourceCommon>(
   ];
 
   return React.useMemo(() => {
+
+    
     const rResources =
       runs && trResources
         ? uniqBy([...runs, ...trResources], (r) => r.metadata.name)

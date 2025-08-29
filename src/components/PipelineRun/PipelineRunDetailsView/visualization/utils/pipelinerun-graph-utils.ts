@@ -452,7 +452,7 @@ export const appendStatus = (
       existingTaskRuns.push(tr);
       taskRunsByTaskName.set(taskName, existingTaskRuns);
     } else {
-      console.warn(`⚠️ TaskRun ${tr.metadata.name} could not be mapped to a pipeline task!`);
+
     }
   });
 

@@ -190,7 +190,7 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
         }
         taskGroups.get(taskName).push(taskRun);
       } else {
-        console.warn(`⚠️ Logs TaskRun ${taskRun.metadata.name} could not be mapped to taskName!`);
+
       }
     });
 

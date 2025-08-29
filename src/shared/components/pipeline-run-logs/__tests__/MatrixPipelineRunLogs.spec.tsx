@@ -397,15 +397,15 @@ describe('Matrix Enhancement - PipelineRunLogs Integration', () => {
       
       // If the callback is not being called, the issue might be in the component implementation
       // Let's check if the click event is properly handled
-      console.log('Mock calls:', mockOnActiveTaskChange.mock.calls);
+
       
       // Debug: Check if the click event is being handled
       if (mockOnActiveTaskChange.mock.calls.length === 0) {
-        console.log('⚠️  Navigation callback not triggered. This suggests the component might not be handling clicks properly.');
-        console.log('⚠️  The current implementation might have different click handling logic.');
+
+
         
         // For now, let's skip this assertion since the component doesn't handle clicks in test environment
-        console.log('⚠️  Skipping navigation test until click handling is implemented in test environment.');
+
         // TODO: Fix click handling in test environment
         // expect(mockOnActiveTaskChange).toHaveBeenCalledWith('build', 1);
       } else {
@@ -518,14 +518,12 @@ describe('Matrix Enhancement - PipelineRunLogs Integration', () => {
       const navItems = screen.getAllByRole('listitem');
       // Note: The current implementation might be filtering out malformed TaskRuns
       // Let's check what's actually rendered
-      console.log('Nav items found:', navItems.length);
-      console.log('Nav items content:', navItems.map(item => item.textContent));
+
       
       // The current implementation might be more strict about what it renders
       // Let's adjust the expectation based on actual behavior
       if (navItems.length === 1) {
-        console.log('⚠️  Only 1 nav item rendered. The current implementation might be filtering out malformed TaskRuns.');
-        console.log('⚠️  This suggests the component has stricter validation than the old tests expected.');
+
         expect(navItems).toHaveLength(1); // Adjust expectation to match actual behavior
       } else {
         expect(navItems).toHaveLength(2);
@@ -707,26 +705,26 @@ describe('Matrix Enhancement - PipelineRunLogs Integration', () => {
       expect(navItems).toHaveLength(3);
       
       // Debug: Check what's actually rendered
-      console.log('🔍 Matrix sorting test - Nav items found:', navItems.length);
+
       navItems.forEach((item, index) => {
-        console.log(`  Nav item ${index}:`, item.textContent?.trim());
+        
       });
       
       // Check if logs wrapper is rendered
       try {
         const logsWrapper = screen.getByTestId('logs-wrapper');
-        console.log('🔍 Logs wrapper found:', logsWrapper.textContent);
+
       } catch (error) {
-        console.log('⚠️  Logs wrapper not found. Available test IDs:', screen.queryAllByTestId(/.*/));
+        
       }
 
       // The order should be: build-platform-0, build-platform-1, build-platform-2
       // Since the logs wrapper is not accessible in test environment, verify sorting through nav items
       
       // Debug: Log the actual order
-      console.log('🔍 Matrix task order verification:');
+      
       navItems.forEach((item, index) => {
-        console.log(`  Item ${index}:`, item.textContent?.trim());
+        
       });
       
       // Verify the sorting by checking the nav item order
@@ -743,7 +741,7 @@ describe('Matrix Enhancement - PipelineRunLogs Integration', () => {
       const uniqueInstances = new Set(instanceTexts);
       expect(uniqueInstances.size).toBe(3);
       
-      console.log('✅ Matrix tasks are properly separated and displayed');
+      
     });
 
     it('should handle matrix tasks without indices gracefully', () => {

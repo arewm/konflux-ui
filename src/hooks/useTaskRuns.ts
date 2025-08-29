@@ -7,7 +7,7 @@ export const useTaskRuns = (
   pipelineRunName: string,
   taskName?: string,
 ): [TaskRunKind[], boolean, unknown] => {
-  const [taskRuns, loaded, error] = useTaskRuns2(
+  const [taskRuns, loaded, error, getNextPage, { hasNextPage, isFetchingNextPage }] = useTaskRuns2(
     namespace,
     React.useMemo(
       () => ({
@@ -21,6 +21,23 @@ export const useTaskRuns = (
       [pipelineRunName, taskName],
     ),
   );
+
+  // Automatically fetch next page when available, but prevent infinite loops
+  const hasTriggeredFetch = React.useRef(false);
+  
+  React.useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && getNextPage && loaded && !hasTriggeredFetch.current) {
+      hasTriggeredFetch.current = true;
+      getNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, getNextPage, loaded]);
+  
+  // Reset the flag when there are no more pages
+  React.useEffect(() => {
+    if (!hasNextPage) {
+      hasTriggeredFetch.current = false;
+    }
+  }, [hasNextPage]);
 
   const sortedTaskRuns = React.useMemo(
     () =>

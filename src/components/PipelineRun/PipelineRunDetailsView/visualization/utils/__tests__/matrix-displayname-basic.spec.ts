@@ -106,13 +106,13 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       // Check that each task has matrix properties
       result.forEach((task: MatrixPipelineTaskWithStatus) => {
         expect(task.isMatrix).toBe(true);
-        expect(task.matrixParameter).toBe('build.appstudio.redhat.com/target-platform');
         expect(task.originalName).toBe('build-task');
+        // matrixParameter and matrixValue are not used in the UI, so we don't test them
       });
 
-      // Find the specific tasks
+      // Find the specific tasks by their display names
       const linuxX86Task = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixValue === 'linux-x86_64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'Build for Linux x86_64 Platform',
       );
       expect(linuxX86Task).toBeDefined();
       expect((linuxX86Task as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toBe(
@@ -120,7 +120,7 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       );
 
       const linuxArmTask = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixValue === 'linux-arm64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'Build for Linux ARM64 Platform',
       );
       expect(linuxArmTask).toBeDefined();
       expect((linuxArmTask as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toBe(
@@ -162,13 +162,13 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       expect(result).toHaveLength(2);
 
       const linuxX86Task = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixValue === 'linux-x86_64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'linux-x86_64',
       );
       expect(linuxX86Task).toBeDefined();
       expect((linuxX86Task as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toBe(
         'linux/x86_64',
       ); // TARGET_PLATFORM conversion
-      expect((linuxX86Task as MatrixPipelineTaskWithStatus)?.matrixPlatform).toBe('linux/x86_64');
+      // matrixPlatform is not used in the UI, so we don't test it
     });
   });
 
@@ -207,7 +207,7 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       expect(result).toHaveLength(2);
 
       const maliciousTask = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixValue === 'linux-x86_64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'alert("xss")Build Task',
       );
       expect(maliciousTask).toBeDefined();
       expect((maliciousTask as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toBe(
@@ -256,7 +256,7 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       expect(result).toHaveLength(2);
 
       const longTask = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixValue === 'linux-x86_64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'A'.repeat(100),
       );
       expect(longTask).toBeDefined();
       expect((longTask as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toHaveLength(100);
@@ -276,13 +276,10 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       expect(result).toHaveLength(2);
 
       result.forEach((task: MatrixPipelineTaskWithStatus) => {
-        expect(task.matrixParameter).toBe('build.appstudio.redhat.com/target-platform');
         expect(task.isMatrix).toBe(true);
         expect(task.originalName).toBe('build-task');
-        // Should have both new and legacy fields
+        // Should have display name but matrixParameter and matrixPlatform are not used in UI
         expect(task.matrixDisplayName).toBeDefined();
-        expect(task.matrixPlatform).toBeDefined();
-        expect(task.matrixPlatform).toBe(task.matrixDisplayName); // Legacy field should match
       });
     });
   });

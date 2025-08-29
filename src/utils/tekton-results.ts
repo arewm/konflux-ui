@@ -253,10 +253,10 @@ export const createTektonResultsUrl = (
   `${URL_PREFIX}/${namespace}/results/-/records?${new URLSearchParams({
     // default sort should always be by `create_time desc`
     ['order_by']: 'create_time desc',
-    ['page_size']: `${Math.max(
-      MINIMUM_PAGE_SIZE,
-      Math.min(MAXIMUM_PAGE_SIZE, options?.limit >= 0 ? options.limit : options?.pageSize ?? 100),
-    )}`,
+                  ['page_size']: `${Math.max(
+                MINIMUM_PAGE_SIZE,
+                Math.min(MAXIMUM_PAGE_SIZE, options?.limit >= 0 ? options.limit : options?.pageSize ?? 30),
+              )}`,
     ...(nextPageToken ? { ['page_token']: nextPageToken } : {}),
     // get partial response with required fields
     ['PartialResponse']: 'true',
@@ -302,29 +302,7 @@ export const getFilteredRecord = async <R extends K8sResourceCommon>(
     try {
       let list: RecordsList = await commonFetchJSON(url);
       
-      // If no limit is specified and there are more pages, fetch all remaining pages
-      if (!options?.limit && list?.nextPageToken) {
-        const allRecords = [...(list?.records ?? [])];
-        let currentPageToken = list.nextPageToken;
-        
-        // Fetch all remaining pages
-        while (currentPageToken) {
-          const nextPageUrl = createTektonResultsUrl(namespace, dataTypes, filter, options, currentPageToken);
-          const nextPage: RecordsList = await commonFetchJSON(nextPageUrl);
-          
-          if (nextPage?.records) {
-            allRecords.push(...nextPage.records);
-          }
-          
-          currentPageToken = nextPage?.nextPageToken || null;
-        }
-        
-        // Update the list with all records and no next page token
-        list = {
-          nextPageToken: null,
-          records: allRecords,
-        };
-      }
+
       
       if (options?.limit >= 0) {
         list = {

@@ -10,7 +10,9 @@ import {
 } from '@patternfly/react-core';
 import { ElementModel, GraphElement } from '@patternfly/react-topology';
 import { PipelineRunLabel } from '../../../../consts/pipelinerun';
+import { TektonResourceLabel } from '../../../../types';
 import { TASKRUN_DETAILS_PATH } from '../../../../routes/paths';
+import { createMatrixInstanceLabel } from '../visualization/utils/pipelinerun-graph-utils';
 import { useNamespace } from '../../../../shared/providers/Namespace';
 import { StatusIconWithTextLabel } from '../../../StatusIcon/StatusIcon';
 import TaskRunLogs from '../../../TaskRuns/TaskRunLogs';
@@ -52,10 +54,39 @@ const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({
       const childRef = pipelineRun.status.childReferences.find(
         (ref: any) => ref.name === taskRun.metadata?.name
       );
-      return childRef?.displayName;
+      if (childRef?.displayName) {
+        return childRef.displayName;
+      }
     }
+    
+    // If no displayName from childReferences, generate matrix information for matrix tasks
+    if (taskRun && pipelineRun?.status?.pipelineSpec?.tasks) {
+      const currentTaskName = taskRun.metadata?.labels?.[TektonResourceLabel.pipelineTask];
+      
+      if (currentTaskName) {
+        const pipelineTask = pipelineRun.status.pipelineSpec.tasks.find(t => t.name === currentTaskName);
+        
+        if (pipelineTask) {
+          // Check if this is a matrix task
+          const matrixTaskRuns = taskRuns.filter(tr => 
+            tr.metadata?.labels?.[TektonResourceLabel.pipelineTask] === currentTaskName
+          );
+          const isMatrixTask = matrixTaskRuns.length > 1;
+          
+          if (isMatrixTask) {
+            // Matrix task: generate matrix label using the same logic as logs page
+            const instanceIndex = matrixTaskRuns.findIndex(tr => tr.metadata.name === taskRun.metadata.name);
+            
+            if (instanceIndex >= 0) {
+              return createMatrixInstanceLabel(pipelineTask, taskRun, pipelineRun, instanceIndex);
+            }
+          }
+        }
+      }
+    }
+    
     return undefined;
-  }, [taskRun, pipelineRun]);
+  }, [taskRun, pipelineRun, taskRuns]);
 
   return (
     <>
