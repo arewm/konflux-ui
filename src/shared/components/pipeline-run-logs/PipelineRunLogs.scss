@@ -15,6 +15,27 @@
   &__navitem {
     cursor: pointer;
   }
+  &__nav-button {
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    padding: var(--pf-v5-global--spacer--sm);
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    display: flex;
+    align-items: center;
+    
+    &:hover {
+      background-color: var(--pf-v5-global--BackgroundColor--150);
+    }
+    
+    &:focus {
+      outline: 2px solid var(--pf-v5-global--primary-color--100);
+      outline-offset: -2px;
+    }
+  }
   &__namespan {
     margin-left: var(--pf-v5-global--spacer--sm);
     white-space: nowrap;

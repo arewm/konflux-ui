@@ -23,7 +23,7 @@ export const useSearchParam = (
   const replace = options?.replace ?? true;
   const set = React.useCallback(
     (newValue: string) => {
-      const newSearchParams = new URLSearchParams(window.location.search);
+      const newSearchParams = new URLSearchParams(searchParams);
       if (newSearchParams.get(name) !== newValue) {
         if (unsetWhenDefaultValue && newValue === defaultValueRef.current) {
           newSearchParams.delete(name);
@@ -33,16 +33,16 @@ export const useSearchParam = (
         setSearchParams(newSearchParams, { replace });
       }
     },
-    [name, setSearchParams, unsetWhenDefaultValue, replace],
+    [name, setSearchParams, unsetWhenDefaultValue, replace, searchParams],
   );
 
   const unset = React.useCallback(() => {
-    const newSearchParams = new URLSearchParams(window.location.search);
+    const newSearchParams = new URLSearchParams(searchParams);
     if (newSearchParams.has(name)) {
       newSearchParams.delete(name);
       setSearchParams(newSearchParams);
     }
-  }, [name, setSearchParams]);
+  }, [name, setSearchParams, searchParams]);
 
   return [value, set, unset];
 };

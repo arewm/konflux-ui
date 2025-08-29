@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Bullseye, Spinner } from '@patternfly/react-core';
 import { useNamespace } from '~/shared/providers/Namespace';
 import { usePipelineRun } from '../../../../hooks/usePipelineRuns';
@@ -15,24 +15,39 @@ const PipelineRunLogsTab: React.FC = () => {
   const namespace = useNamespace();
   const [pipelineRun, loaded, error] = usePipelineRun(namespace, pipelineRunName);
   const [taskRuns, taskRunsLoaded, taskRunError] = useTaskRuns(namespace, pipelineRunName);
-  const [activeTask, setActiveTask, unSetActiveTask] = useSearchParam('task', undefined);
-  const [, setActiveIndex, unSetActiveIndex] = useSearchParam('index', undefined);
+  const [activeTask, setActiveTask, unSetActiveTask] = useSearchParam('task', null);
+  const [activeIndex, setActiveIndex, unSetActiveIndex] = useSearchParam('index', null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+
 
   const handleActiveTaskChange = React.useCallback(
-    (taskName: string, index?: number) => {
+    (taskName: string, matrixIndex?: number) => {
       if (taskName) {
-        setActiveTask(taskName);
-        if (index !== undefined) {
-          setActiveIndex(index.toString());
+        // Create a single URLSearchParams update to avoid race conditions
+        const newSearchParams = new URLSearchParams(searchParams);
+        
+        // Update task parameter
+        newSearchParams.set('task', taskName);
+        
+        // Update or clear index parameter
+        if (matrixIndex !== undefined) {
+          newSearchParams.set('index', matrixIndex.toString());
         } else {
-          unSetActiveIndex();
+          newSearchParams.delete('index');
         }
+        
+        // Apply both changes atomically
+        setSearchParams(newSearchParams, { replace: true });
       } else {
-        unSetActiveTask();
-        unSetActiveIndex();
+        // Clear both parameters atomically
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('task');
+        newSearchParams.delete('index');
+        setSearchParams(newSearchParams, { replace: true });
       }
     },
-    [setActiveTask, unSetActiveTask, setActiveIndex, unSetActiveIndex],
+    [searchParams, setSearchParams],
   );
 
   const loadError = error || taskRunError;
