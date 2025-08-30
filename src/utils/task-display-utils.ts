@@ -1,6 +1,5 @@
-import { PipelineTask, TaskRunKind, PipelineRunKind } from '../types';
-import { TektonResourceLabel } from '../types';
 import { createMatrixInstanceLabel } from '../components/PipelineRun/PipelineRunDetailsView/visualization/utils/pipelinerun-graph-utils';
+import { PipelineTask, TaskRunKind, PipelineRunKind , TektonResourceLabel } from '../types';
 
 export interface TaskDisplayInfo {
   /** The base task name */

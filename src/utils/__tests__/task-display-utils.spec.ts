@@ -1,6 +1,6 @@
-import { getTaskDisplayInfo } from '../task-display-utils';
 import { getMatrixInstanceIndex } from '../../components/PipelineRun/PipelineRunDetailsView/visualization/utils/pipelinerun-graph-utils';
 import { PipelineTask, TaskRunKind, PipelineRunKind } from '../../types';
+import { getTaskDisplayInfo } from '../task-display-utils';
 
 describe('task-display-utils', () => {
   describe('getTaskDisplayInfo', () => {

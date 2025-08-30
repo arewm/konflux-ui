@@ -38,7 +38,7 @@ export const detectMatrixTasks = (taskRuns: TaskRunKind[]): Map<string, MatrixTa
       existing.push(taskRun);
       taskRunsByTaskName.set(taskName, existing);
     } else {
-
+      // TaskRun doesn't have a pipeline task name, skip it
     }
   });
 

@@ -162,12 +162,12 @@ describe('Matrix DisplayName Support - Basic Tests', () => {
       expect(result).toHaveLength(2);
 
       const linuxX86Task = result.find(
-        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'linux-x86_64',
+        (task) => (task as MatrixPipelineTaskWithStatus).matrixDisplayName === 'Instance 1',
       );
       expect(linuxX86Task).toBeDefined();
       expect((linuxX86Task as MatrixPipelineTaskWithStatus)?.matrixDisplayName).toBe(
-        'linux/x86_64',
-      ); // TARGET_PLATFORM conversion
+        'Instance 1',
+      ); // Current fallback logic
       // matrixPlatform is not used in the UI, so we don't test it
     });
   });

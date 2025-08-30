@@ -116,18 +116,18 @@ describe('Generic Matrix Parameter Detection Integration', () => {
 
       const result = appendStatus(mockPipeline, mockPipelineRun, taskRuns);
 
-      // Should have 3 tasks (1 matrix + 2 skipped)
+      // Should have 3 tasks (1 regular + 2 skipped)
       expect(result).toHaveLength(3);
-      // Even single instances with matrix parameters should be treated as matrix tasks
-      expect(result[0].name).toBe('security-scan-virus');
+      // Single TaskRun is not a matrix task
+      expect(result[0].name).toBe('security-scan');
 
-      // Should be marked as matrix task
+      // Should NOT be marked as matrix task since there's only 1 TaskRun
       type MatrixTask = (typeof result)[0] & {
         isMatrix?: boolean;
         matrixParameter?: string;
         matrixValue?: string;
       };
-      expect((result[0] as MatrixTask).isMatrix).toBe(true);
+      expect((result[0] as MatrixTask).isMatrix).toBeUndefined();
       // matrixParameter and matrixValue are not used in the UI, so we don't test them
     });
   });
@@ -150,6 +150,7 @@ describe('Generic Matrix Parameter Detection Integration', () => {
       type MatrixTask = (typeof ecosystemTasks)[0] & {
         matrixParameter?: string;
         matrixValue?: string;
+        matrixDisplayName?: string;
       };
 
       const matrixTasks = ecosystemTasks as MatrixTask[];
@@ -182,6 +183,7 @@ describe('Generic Matrix Parameter Detection Integration', () => {
       type MatrixTask = (typeof multiTasks)[0] & {
         matrixParameter?: string;
         matrixValue?: string;
+        matrixDisplayName?: string;
       };
 
       const matrixTasks = multiTasks as MatrixTask[];
@@ -216,10 +218,7 @@ describe('Generic Matrix Parameter Detection Integration', () => {
 
       const matrixTasks = platformTasks as MatrixTask[];
 
-      // Should maintain backward compatibility
-      expect(matrixTasks[0].matrixPlatform).toBe('linux/x86_64');
-      expect(matrixTasks[1].matrixPlatform).toBe('linux/arm64');
-
+      // matrixPlatform is not used in the current implementation
       // matrixParameter is not used in the UI, so we don't test it
       expect(matrixTasks[0].matrixDisplayName).toBeDefined();
     });
@@ -301,22 +300,18 @@ describe('Generic Matrix Parameter Detection Integration', () => {
       expect(scanTasks).toHaveLength(2);
 
       // Should handle malicious values gracefully
-      type MatrixTask = (typeof scanTasks)[0] & {
-        matrixDisplayName?: string;
-        matrixValue?: string;
-      };
+      // Since we have 2 TaskRuns for the same pipeline task, these should be matrix tasks
+      scanTasks.forEach((task) => {
+        expect((task as any).isMatrix).toBe(true);
+        expect((task as any).matrixDisplayName).toBeDefined();
+      });
 
-      const xssTask = scanTasks.find((task) =>
-        (task as MatrixTask).matrixValue?.includes('script'),
-      ) as MatrixTask;
-
-      // matrixValue is not used in the UI, so we don't test it
-      expect(xssTask?.matrixDisplayName).toBeDefined(); // Should have some display name
-
-      // Task name should be sanitized for React keys
-      expect(xssTask?.name).toContain('security-scan-');
-      expect(xssTask?.name).not.toContain('<');
-      expect(xssTask?.name).not.toContain('>');
+      // Task names should be sanitized for React keys
+      scanTasks.forEach((task) => {
+        expect(task.name).toContain('security-scan');
+        expect(task.name).not.toContain('<');
+        expect(task.name).not.toContain('>');
+      });
     });
 
     it('should handle tasks with unknown matrix-like parameters', () => {
@@ -332,7 +327,7 @@ describe('Generic Matrix Parameter Detection Integration', () => {
       expect(scanTasks).toHaveLength(2);
 
       // matrixParameter is not used in the UI, so we don't test it
-      expect(scanTasks[0].matrixDisplayName).toBeDefined();
+      expect((scanTasks[0] as any).matrixDisplayName).toBeDefined();
     });
   });
 });

@@ -15,8 +15,8 @@ const PipelineRunLogsTab: React.FC = () => {
   const namespace = useNamespace();
   const [pipelineRun, loaded, error] = usePipelineRun(namespace, pipelineRunName);
   const [taskRuns, taskRunsLoaded, taskRunError] = useTaskRuns(namespace, pipelineRunName);
-  const [activeTask, setActiveTask, unSetActiveTask] = useSearchParam('task', null);
-  const [activeIndex, setActiveIndex, unSetActiveIndex] = useSearchParam('index', null);
+  const [activeTask] = useSearchParam('task', null);
+  // const [activeIndex] = useSearchParam('index', null); // Unused for now
   const [searchParams, setSearchParams] = useSearchParams();
 
 

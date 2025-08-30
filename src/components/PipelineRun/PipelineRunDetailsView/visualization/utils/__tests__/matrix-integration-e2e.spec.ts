@@ -175,9 +175,11 @@ describe('Matrix Integration E2E - Minimal', () => {
     const pipeline = getPipelineFromPipelineRun(pipelineRun);
     const result = appendStatus(pipeline, pipelineRun, taskRuns);
 
+
+
     expect(result).toHaveLength(2);
 
-    const scanTasks = result.filter((task) => task.name.startsWith('scan-'));
+    const scanTasks = result.filter((task) => task.name.startsWith('security-scan-'));
     expect(scanTasks).toHaveLength(2);
 
     scanTasks.forEach((task) => {

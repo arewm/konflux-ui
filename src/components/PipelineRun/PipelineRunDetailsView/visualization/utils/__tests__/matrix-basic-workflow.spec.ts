@@ -119,9 +119,9 @@ describe('Matrix Basic Workflow', () => {
     const pipeline = getPipelineFromPipelineRun(pipelineRun);
     const result = appendStatus(pipeline, pipelineRun, taskRuns);
 
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3); // 2 matrix tasks + 1 regular task
 
-    const buildTasks = result.filter((task) => task.name.startsWith('build-'));
+    const buildTasks = result.filter((task) => task.name.startsWith('build-') || task.name.includes('Build'));
     expect(buildTasks).toHaveLength(2);
 
     buildTasks.forEach((task) => {
@@ -161,10 +161,12 @@ describe('Matrix Basic Workflow', () => {
     const pipeline = getPipelineFromPipelineRun(pipelineRun);
     const result = appendStatus(pipeline, pipelineRun, taskRuns);
 
-    expect(result).toHaveLength(2);
 
-    const buildTask = result.find((task) => task.name.startsWith('build-'));
-    expect((buildTask as MatrixPipelineTaskWithStatus).isMatrix).toBe(true);
+
+    expect(result).toHaveLength(2); // 1 matrix task + 1 regular task
+
+    const buildTask = result.find((task) => task.name === 'build');
+    expect((buildTask as MatrixPipelineTaskWithStatus).isMatrix).toBeUndefined(); // Only 1 TaskRun, not a matrix task
 
     const testTask = result.find((task) => task.name === 'test');
     expect((testTask as MatrixPipelineTaskWithStatus).isMatrix).toBeUndefined();

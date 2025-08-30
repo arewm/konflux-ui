@@ -10,16 +10,14 @@ import {
 } from '@patternfly/react-core';
 import { ElementModel, GraphElement } from '@patternfly/react-topology';
 import { PipelineRunLabel } from '../../../../consts/pipelinerun';
-import { TektonResourceLabel } from '../../../../types';
 import { TASKRUN_DETAILS_PATH } from '../../../../routes/paths';
-import { createMatrixInstanceLabel } from '../visualization/utils/pipelinerun-graph-utils';
 import { useNamespace } from '../../../../shared/providers/Namespace';
+import { TektonResourceLabel , PipelineRunKind, TaskRunKind } from '../../../../types';
 import { StatusIconWithTextLabel } from '../../../StatusIcon/StatusIcon';
 import TaskRunLogs from '../../../TaskRuns/TaskRunLogs';
 import { PipelineRunNodeData } from '../visualization/types';
+import { createMatrixInstanceLabel } from '../visualization/utils/pipelinerun-graph-utils';
 import TaskRunDetails from './TaskRunDetails';
-
-import { PipelineRunKind, TaskRunKind } from '../../../../types';
 
 import './TaskRunPanel.scss';
 
@@ -51,7 +49,7 @@ const TaskRunPanel: React.FC<React.PropsWithChildren<Props>> = ({
   // Check if we have a displayName from childReferences (same logic as logs page)
   const displayName = React.useMemo(() => {
     if (taskRun && pipelineRun?.status?.childReferences) {
-      const childRef = pipelineRun.status.childReferences.find(
+      const childRef = (pipelineRun.status.childReferences as any[]).find(
         (ref: any) => ref.name === taskRun.metadata?.name
       );
       if (childRef?.displayName) {

@@ -418,6 +418,39 @@ const createMatrixTaskEntry = (
   return matrixTask;
 };
 
+/**
+ * Extracts the matrix instance index from a TaskRun name
+ * This matches the logic used in the logs page for consistent sorting
+ */
+export const getMatrixInstanceIndex = (taskRun: TaskRunKind): number => {
+  // Priority 1: Try to get the actual Tekton matrix index from the TaskRun
+  if (taskRun.metadata?.labels?.[TektonResourceLabel.pipelineTask]) {
+    // Check if there's a Tekton matrix index label
+    const tektonMatrixIndex = taskRun.metadata?.labels?.['tekton.dev/matrix-index'];
+    if (tektonMatrixIndex !== undefined) {
+      const index = parseInt(tektonMatrixIndex, 10);
+      if (!isNaN(index)) {
+        return index;
+      }
+    }
+  }
+
+  // Priority 2: Extract index from the TaskRun name (e.g., "task-name-0" → index 0)
+  // This is the most reliable method as Tekton assigns these indices deterministically
+  const nameIndexMatch = taskRun.metadata?.name?.match(/-(\d+)$/);
+  if (nameIndexMatch) {
+    const extractedIndex = parseInt(nameIndexMatch[1], 10);
+    if (!isNaN(extractedIndex)) {
+      return extractedIndex;
+    }
+  }
+
+  // If we can't extract the index, something is wrong with the TaskRun data
+  // Return 0 as a safe default to maintain sorting stability
+  return 0;
+};
+
+
 export const appendStatus = (
   pipeline: PipelineKind,
   pipelineRun: PipelineRunKind,
@@ -506,8 +539,9 @@ export const appendStatus = (
           task,
           taskRun,
           pipelineRun,
-          undefined, // Let the function determine the parameter name
-          matrixLabel, // Use the generated meaningful label
+          undefined, // matrixParameter
+          undefined, // matrixValue
+          matrixLabel, // matrixDisplayName
         );
         
         result.push(matrixTask);
@@ -521,38 +555,6 @@ export const appendStatus = (
   });
 
   return result;
-};
-
-/**
- * Extracts the matrix instance index from a TaskRun name
- * This matches the logic used in the logs page for consistent sorting
- */
-export const getMatrixInstanceIndex = (taskRun: TaskRunKind): number => {
-  // Priority 1: Try to get the actual Tekton matrix index from the TaskRun
-  if (taskRun.metadata?.labels?.[TektonResourceLabel.pipelineTask]) {
-    // Check if there's a Tekton matrix index label
-    const tektonMatrixIndex = taskRun.metadata?.labels?.['tekton.dev/matrix-index'];
-    if (tektonMatrixIndex !== undefined) {
-      const index = parseInt(tektonMatrixIndex, 10);
-      if (!isNaN(index)) {
-        return index;
-      }
-    }
-  }
-
-  // Priority 2: Extract index from the TaskRun name (e.g., "task-name-0" → index 0)
-  // This is the most reliable method as Tekton assigns these indices deterministically
-  const nameIndexMatch = taskRun.metadata?.name?.match(/-(\d+)$/);
-  if (nameIndexMatch) {
-    const extractedIndex = parseInt(nameIndexMatch[1], 10);
-    if (!isNaN(extractedIndex)) {
-      return extractedIndex;
-    }
-  }
-
-  // If we can't extract the index, something is wrong with the TaskRun data
-  // Return 0 as a safe default to maintain sorting stability
-  return 0;
 };
 
 export const taskHasWhenExpression = (task: PipelineTask): boolean => task?.when?.length > 0;

@@ -13,7 +13,7 @@ import { PipelineRunKind, TaskRunKind } from '../types';
 import { K8sGroupVersionKind, K8sModelCommon, K8sResourceCommon, Selector } from '../types/k8s';
 import { getCommitSha } from '../utils/commits-utils';
 import { pipelineRunStatus, runStatus } from '../utils/pipeline-utils';
-import { EQ } from '../utils/tekton-results';
+import { EQ, OR } from '../utils/tekton-results';
 import { useApplication } from './useApplications';
 import { useComponents } from './useComponents';
 import { GetNextPage, NextPageProps, useTRPipelineRuns, useTRTaskRuns } from './useTektonResults';
