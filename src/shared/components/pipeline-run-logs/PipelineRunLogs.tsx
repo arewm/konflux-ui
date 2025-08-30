@@ -25,13 +25,15 @@ interface PipelineRunLogsProps {
 interface PipelineRunLogsState {
   activeItem: string;
   navUntouched: boolean;
+  lastUrlParams: string;
 }
 class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunLogsState> {
   constructor(props: PipelineRunLogsProps) {
     super(props);
     this.state = { 
       activeItem: null, 
-      navUntouched: true
+      navUntouched: true,
+      lastUrlParams: window.location.search
     };
   }
 
@@ -40,13 +42,19 @@ class PipelineRunLogs extends React.Component<PipelineRunLogsProps, PipelineRunL
   }
 
   componentDidUpdate(prevProps: PipelineRunLogsProps) {
-    // Check if URL parameters have changed
-    const prevUrlParams = new URLSearchParams(window.location.search);
-    const currentUrlParams = new URLSearchParams(window.location.search);
+    const currentUrlParams = window.location.search;
     
+    // Check if URL parameters have changed
     if (prevProps.activeTask !== this.props.activeTask || 
-        prevUrlParams.get('index') !== currentUrlParams.get('index')) {
-      this.updateActiveItemFromProps(this.props);
+        this.state.lastUrlParams !== currentUrlParams) {
+      
+      // Update the lastUrlParams to prevent infinite loops
+      this.setState({ lastUrlParams: currentUrlParams });
+      
+      // Only update the active item if the URL actually changed
+      if (this.state.lastUrlParams !== currentUrlParams) {
+        this.updateActiveItemFromProps(this.props);
+      }
     }
   }
 
